@@ -54,7 +54,7 @@ export const createTask = async (taskData: Omit<Task, 'id'>) => {
       success: true,
       message: 'Task creation request sent successfully.',
     };
-  } catch (error)_ {
+  } catch (error) {
     console.error('Error creating task:', error);
     return { success: false, message: 'Failed to create task.' };
   }
