@@ -1,0 +1,199 @@
+/* Container */
+.container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: "Google Sans", Roboto, sans-serif;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 16px;
+  color: #5f6368;
+}
+
+/* Sections */
+.promptSection,
+.responsesSection {
+  margin-bottom: 32px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: #3c4043;
+  margin: 0 0 16px 0;
+}
+
+/* Prompt Box */
+.promptBox {
+  background-color: #e8f0fe;
+  border: 1px solid #669df6;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.promptBox p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #3c4043;
+}
+
+/* Response Cards */
+.responseCard {
+  background-color: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.responseHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.responseLabel {
+  font-size: 16px;
+  font-weight: 500;
+  color: #3c4043;
+}
+
+.modelLabel {
+  font-size: 12px;
+  color: #5f6368;
+  background-color: #f8f9fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.responseText {
+  margin-bottom: 24px;
+}
+
+.responseText p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #3c4043;
+}
+
+/* Rating Section */
+.ratingSection {
+  margin-bottom: 20px;
+}
+
+.ratingLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3c4043;
+  margin-bottom: 12px;
+}
+
+.ratingButtons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ratingButton {
+  width: 48px;
+  height: 48px;
+  border: 2px solid #dadce0;
+  border-radius: 8px;
+  background-color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 200ms;
+}
+
+.ratingButton:hover {
+  background-color: #f8f9fa;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+.ratingButton.selected {
+  background-color: #1a73e8;
+  border-color: #1a73e8;
+  color: #fff;
+}
+
+.ratingLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #5f6368;
+}
+
+/* Comment Section */
+.commentSection {
+  margin-bottom: 16px;
+}
+
+.commentLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3c4043;
+  margin-bottom: 8px;
+}
+
+.commentInput {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: "Google Sans", Roboto, sans-serif;
+  resize: vertical;
+  transition: border-color 200ms;
+}
+
+.commentInput:focus {
+  outline: none;
+  border-color: #1a73e8;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #dadce0;
+}
+
+.submitButton {
+  padding: 8px 24px;
+  background-color: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: "Google Sans", Roboto, sans-serif;
+  cursor: pointer;
+  transition: all 200ms;
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: #1765cc;
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15);
+}
+
+.submitButton:disabled {
+  background-color: #dadce0;
+  color: #80868b;
+  cursor: not-allowed;
+}

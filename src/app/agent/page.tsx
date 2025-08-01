@@ -10,7 +10,7 @@ const AgentPage = () => {
     currentTask,
     isLoading,
     error,
-    actions: { fetchNextTask },
+    fetchNextTask,
   } = useAgentStore();
 
   useEffect(() => {

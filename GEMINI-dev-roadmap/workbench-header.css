@@ -1,0 +1,175 @@
+/* Header Container */
+.header {
+  background-color: #fff;
+  box-shadow: 0 1px 1px 0 rgba(65, 69, 73, .3), 0 1px 3px 1px rgba(65, 69, 73, .15);
+  position: relative;
+  z-index: 986;
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 24px;
+}
+
+/* Left Section */
+.leftSection {
+  display: flex;
+  align-items: center;
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+}
+
+.appTitle {
+  color: #3c4043;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 24px;
+  font-family: "Product Sans", "Google Sans", Roboto, sans-serif;
+}
+
+/* Right Section */
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.appsButton {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 200ms;
+}
+
+.appsButton:hover {
+  background-color: rgba(60, 64, 67, 0.08);
+}
+
+.appsIcon {
+  width: 24px;
+  height: 24px;
+  fill: #5f6368;
+}
+
+/* Account Container */
+.accountContainer {
+  position: relative;
+}
+
+.accountButton {
+  width: 40px;
+  height: 40px;
+  padding: 4px;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: box-shadow 200ms;
+}
+
+.accountButton:hover {
+  background-color: rgba(60, 64, 67, 0.08);
+}
+
+.profilePicture {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Account Menu */
+.accountMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .3), 0 2px 6px 2px rgba(60, 64, 67, .15);
+  min-width: 354px;
+  max-width: 400px;
+  animation: menuSlideDown 200ms ease-out;
+}
+
+@keyframes menuSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.accountInfo {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  gap: 16px;
+}
+
+.menuProfilePicture {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.accountDetails {
+  flex: 1;
+}
+
+.userName {
+  font-size: 16px;
+  font-weight: 500;
+  color: #3c4043;
+  line-height: 22px;
+}
+
+.userEmail {
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 20px;
+}
+
+.menuDivider {
+  height: 1px;
+  background-color: #dadce0;
+  margin: 0;
+}
+
+.menuItem {
+  width: 100%;
+  padding: 14px 24px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  color: #3c4043;
+  cursor: pointer;
+  transition: background-color 200ms;
+}
+
+.menuItem:hover {
+  background-color: rgba(26, 115, 232, 0.04);
+}
