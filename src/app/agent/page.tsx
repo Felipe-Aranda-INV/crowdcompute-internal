@@ -1,22 +1,35 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import TaskList from '@/components/tasks/TaskList';
+import { useEffect } from 'react';
+import useAgentStore from '@/store/agentStore';
+import TaskRenderer from '@/components/tasks/TaskRenderer';
+import { CircularProgress, Alert } from '@mui/material';
 
-const AgentDashboardPage = () => {
-  const { data: session } = useSession();
+const AgentPage = () => {
+  const {
+    currentTask,
+    isLoading,
+    error,
+    actions: { fetchNextTask },
+  } = useAgentStore();
 
-  if (session?.user?.role !== 'agent') {
-    return <div>Access Denied</div>;
+  useEffect(() => {
+    fetchNextTask();
+  }, [fetchNextTask]);
+
+  if (isLoading) {
+    return <CircularProgress />;
   }
 
-  return (
-    <div>
-      <h1>Agent Dashboard</h1>
-      <p>Welcome, {session?.user?.name}</p>
-      <TaskList />
-    </div>
-  );
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
+
+  if (!currentTask) {
+    return <div>No tasks available.</div>;
+  }
+
+  return <TaskRenderer task={currentTask} />;
 };
 
-export default AgentDashboardPage;
+export default AgentPage;

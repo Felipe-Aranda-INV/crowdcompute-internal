@@ -1,13 +1,14 @@
-import MainToolbar from '@/components/shell/MainToolbar';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  return (
-    <div>
-      <MainToolbar />
-      <div style={{ padding: '20px' }}>
-        <h1>Welcome to CrowdCompute</h1>
-        <p>Please select a dashboard to get started.</p>
-      </div>
-    </div>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push('/manager');
+  }, [router]);
+
+  return null; // Or a loading spinner
 }

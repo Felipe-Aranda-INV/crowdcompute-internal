@@ -1,160 +1,87 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { Task } from '@/types/tasks';
 
-// Simulating the structure of a task
-interface Task {
-  id: string;
-  title: string;
-  isParkingAllowed: boolean;
-}
-
-// Simulating the structure of session statistics
-interface SessionStats {
-  completed: number;
-  inProgress: number;
-  canComplete: boolean;
-}
+// ### IMPORTANT ###
+// This URL must be replaced with your actual Google Apps Script web app URL.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
 
 interface AgentState {
-  timeLeft: number; // in seconds
-  tasksAvailable: number;
   currentTask: Task | null;
-  parkedCount: number;
-  sessionStats: SessionStats;
   isLoading: boolean;
   error: string | null;
   actions: {
-    startTimer: () => void;
-    stopTimer: () => void;
-    parkTask: () => void;
-    completeSession: () => void;
-    setCurrentTask: (task: Task | null) => void;
-    fetchNextTask: (agentId: string) => Promise<void>;
+    fetchNextTask: () => Promise<void>;
     submitTask: (submissionData: {
       taskId: string;
-      agentId: string;
       answer: Record<string, any>;
     }) => Promise<void>;
   };
 }
 
-const APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbybzYID2K-SQX6q1N6-OuatREdkb1nd5rhnoxiG-Q4dZm3M99-kWD0vdwcYVGCDd8ys/exec';
-
 const useAgentStore = create<AgentState>()(
-  immer((set, get) => {
-    let timer: NodeJS.Timeout | null = null;
+  immer((set, get) => ({
+    currentTask: null,
+    isLoading: false,
+    error: null,
+    actions: {
+      fetchNextTask: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          // Construct the URL for the GET request
+          const url = new URL(APPS_SCRIPT_URL);
+          url.searchParams.append('action', 'getNextTask');
 
-    return {
-      timeLeft: 300, // 5 minutes
-      tasksAvailable: 10,
-      currentTask: {
-        id: 'task-123',
-        title: 'Sample Task',
-        isParkingAllowed: true,
-      },
-      parkedCount: 0,
-      sessionStats: {
-        completed: 5,
-        inProgress: 1,
-        canComplete: false,
-      },
-      isLoading: false,
-      error: null,
-      actions: {
-        startTimer: () => {
-          if (timer) clearInterval(timer);
-          timer = setInterval(() => {
-            set((state) => {
-              if (state.timeLeft > 0) {
-                state.timeLeft -= 1;
-              } else {
-                if (timer) clearInterval(timer);
-              }
-            });
-          }, 1000);
-        },
-        stopTimer: () => {
-          if (timer) clearInterval(timer);
-        },
-        parkTask: () => {
-          set((state) => {
-            if (state.currentTask && state.currentTask.isParkingAllowed) {
-              state.parkedCount += 1;
-              state.currentTask = null; // Task is parked
-            }
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8',
+            },
           });
-        },
-        completeSession: () => {
-          set((state) => {
-            if (state.sessionStats.canComplete) {
-              // Logic to complete session
-              console.log('Session completed');
-            }
-          });
-        },
-        setCurrentTask: (task) => {
-          set((state) => {
-            state.currentTask = task;
-          });
-        },
-        fetchNextTask: async (agentId: string) => {
-          set((state) => {
-            state.isLoading = true;
-            state.error = null;
-          });
-          try {
-            const response = await fetch(APPS_SCRIPT_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'getNextTask', payload: { agentId } }),
-              mode: 'cors',
-            });
-            const result = await response.json();
 
-            if (!result.success) throw new Error(result.error);
+          // The response from a GET request to Google Apps Script is text.
+          const result = JSON.parse(await response.text());
 
-            set((state) => {
-              state.currentTask = result.data;
-              state.isLoading = false;
-            });
-          } catch (error: any) {
-            console.error('Failed to fetch next task:', error);
-            set((state) => {
-              state.error = error.message;
-              state.isLoading = false;
-              state.currentTask = null;
-            });
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to fetch next task.');
           }
-        },
-        submitTask: async (submissionData) => {
-          set((state) => {
-            state.isLoading = true;
-          });
-          try {
-            const response = await fetch(APPS_SCRIPT_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'submitTask', payload: submissionData }),
-              mode: 'cors',
-            });
-            const result = await response.json();
 
-            if (!result.success) throw new Error(result.error);
-
-            // Submission successful, fetch the next task
-            await get().actions.fetchNextTask(submissionData.agentId);
-          } catch (error: any) {
-            console.error('Failed to submit task:', error);
-            set((state) => {
-              state.error = `Failed to submit: ${error.message}`;
-              state.isLoading = false;
-            });
-          }
-        },
+          set({ currentTask: result.data, isLoading: false });
+        } catch (error: any) {
+          console.error('Failed to fetch next task:', error);
+          set({ error: error.message, isLoading: false, currentTask: null });
+        }
       },
-    };
-  })
+      submitTask: async (submissionData) => {
+        set({ isLoading: true });
+        try {
+          const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'submitTask',
+              payload: submissionData,
+            }),
+            mode: 'cors',
+          });
+
+          const result = await response.json();
+
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to submit task.');
+          }
+
+          // Submission successful, fetch the next task
+          await get().actions.fetchNextTask();
+        } catch (error: any) {
+          console.error('Failed to submit task:', error);
+          set({ error: `Failed to submit: ${error.message}`, isLoading: false });
+        }
+      },
+    },
+  }))
 );
 
 export default useAgentStore;
