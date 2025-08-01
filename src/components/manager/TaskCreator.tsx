@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import useManagerStore from '@/store/managerStore';
+import toast from 'react-hot-toast';
 import { Task, TaskContentItem, SuggestionChip } from '@/types/tasks';
 import {
   Box,
@@ -27,6 +29,8 @@ const TaskCreator = () => {
   const [description, setDescription] = useState('');
   const [content, setContent] = useState<TaskContentItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { createTask } = useManagerStore();
 
   const addContentItem = (type: 'chat' | 'suggestions' | 'card') => {
     let newItem: TaskContentItem;
@@ -73,25 +77,14 @@ const TaskCreator = () => {
     const taskData = { title, description, content };
 
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskData),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert('Task created successfully!');
-        // Reset form
-        setTitle('');
-        setDescription('');
-        setContent([]);
-      } else {
-        alert(`Error: ${result.message}`);
-      }
+      await createTask(taskData);
+      toast.success('Task created successfully!');
+      // Reset form
+      setTitle('');
+      setDescription('');
+      setContent([]);
     } catch (error) {
-      alert('An unexpected error occurred.');
+      toast.error('Failed to create task. Please try again.');
     }
     setIsSubmitting(false);
   };
@@ -108,6 +101,7 @@ const TaskCreator = () => {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           margin="normal"
+          required
         />
         <TextField
           fullWidth
@@ -117,6 +111,7 @@ const TaskCreator = () => {
           margin="normal"
           multiline
           rows={2}
+          required
         />
 
         <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
@@ -160,7 +155,7 @@ const TaskCreator = () => {
           variant="contained"
           color="primary"
           onClick={handleSubmit}
-          disabled={isSubmitting || !title || content.length === 0}
+          disabled={isSubmitting || !title || !description || content.length === 0}
           sx={{ mt: 4 }}
         >
           {isSubmitting ? 'Submitting...' : 'Create Task'}
@@ -171,7 +166,14 @@ const TaskCreator = () => {
 };
 
 // A sub-component to edit a single content item
-const ContentItemEditor = ({ item, onChange, onRemove, onMove }) => {
+interface ContentItemEditorProps {
+  item: TaskContentItem;
+  onChange: (item: TaskContentItem) => void;
+  onRemove: () => void;
+  onMove: (direction: 'up' | 'down') => void;
+}
+
+const ContentItemEditor: React.FC<ContentItemEditorProps> = ({ item, onChange, onRemove, onMove }) => {
   const renderEditor = () => {
     switch (item.type) {
       case 'chat':
@@ -183,7 +185,7 @@ const ContentItemEditor = ({ item, onChange, onRemove, onMove }) => {
                 value={item.content.author}
                 label="Author"
                 onChange={(e) =>
-                  onChange({ ...item, content: { ...item.content, author: e.target.value } })
+                  onChange({ ...item, content: { ...item.content, author: e.target.value as 'user' | 'assistant' } })
                 }
               >
                 <MenuItem value="user">User</MenuItem>
@@ -199,24 +201,29 @@ const ContentItemEditor = ({ item, onChange, onRemove, onMove }) => {
               }
               multiline
               rows={2}
+              required
             />
           </Box>
         );
+      
       case 'suggestions':
-        const handleChipChange = (chipIndex, newLabel) => {
+        const handleChipChange = (chipIndex: number, newLabel: string) => {
           const newSuggestions = [...item.suggestions];
           newSuggestions[chipIndex] = { label: newLabel };
           onChange({ ...item, suggestions: newSuggestions });
         };
+        
         const addChip = () => {
           onChange({ ...item, suggestions: [...item.suggestions, { label: '' }] });
         };
-        const removeChip = (chipIndex) => {
+        
+        const removeChip = (chipIndex: number) => {
           onChange({
             ...item,
             suggestions: item.suggestions.filter((_, i) => i !== chipIndex),
           });
         };
+        
         return (
           <Box>
             {item.suggestions.map((chip, i) => (
@@ -236,11 +243,12 @@ const ContentItemEditor = ({ item, onChange, onRemove, onMove }) => {
                 sx={{ mr: 1, mb: 1 }}
               />
             ))}
-            <IconButton onClick={addChip} size="small">
+            <IconButton onClick={addChip} size="small" color="primary">
               <AddCircleOutline />
             </IconButton>
           </Box>
         );
+      
       case 'card':
         return (
           <TextField
@@ -250,32 +258,35 @@ const ContentItemEditor = ({ item, onChange, onRemove, onMove }) => {
             onChange={(e) =>
               onChange({ ...item, content: { imageUrl: e.target.value } })
             }
+            placeholder="https://example.com/image.jpg"
+            required
           />
         );
+      
       default:
         return null;
     }
   };
 
   return (
-    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="subtitle2" sx={{ textTransform: 'capitalize' }}>
+    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }} elevation={0}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ textTransform: 'capitalize', fontWeight: 600 }}>
           {item.type} Block
         </Typography>
         <Box>
-          <IconButton onClick={() => onMove('up')} size="small">
+          <IconButton onClick={() => onMove('up')} size="small" color="primary">
             <ArrowUpward />
           </IconButton>
-          <IconButton onClick={() => onMove('down')} size="small">
+          <IconButton onClick={() => onMove('down')} size="small" color="primary">
             <ArrowDownward />
           </IconButton>
-          <IconButton onClick={onRemove} size="small">
+          <IconButton onClick={onRemove} size="small" color="error">
             <Delete />
           </IconButton>
         </Box>
       </Box>
-      <Box sx={{ mt: 2 }}>{renderEditor()}</Box>
+      <Box>{renderEditor()}</Box>
     </Paper>
   );
 };

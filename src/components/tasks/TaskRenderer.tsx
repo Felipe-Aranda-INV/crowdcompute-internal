@@ -1,24 +1,48 @@
 'use client';
 
-import { Paper, Box } from '@mui/material';
+import { useState } from 'react';
+import { Paper, Box, Button, Alert } from '@mui/material';
 import { Task, TaskContentItem } from '@/types/tasks';
 import ChatBubble from './ChatBubble';
 import SuggestionChip from './SuggestionChip';
+import useAgentStore from '@/store/agentStore';
+import toast from 'react-hot-toast';
 
 interface TaskRendererProps {
   task: Task;
 }
 
-/**
- * Renders the content of a given task, dynamically displaying different
- * UI components based on the content type.
- */
 const TaskRenderer = ({ task }: TaskRendererProps) => {
+  const [answer, setAnswer] = useState<Record<string, any>>({});
+  const { submitTask, isSubmitting } = useAgentStore();
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setAnswer({ ...answer, selectedSuggestion: suggestion });
+  };
+
+  const handleSubmit = async () => {
+    if (Object.keys(answer).length === 0) {
+      toast.error('Please select an answer before submitting');
+      return;
+    }
+
+    try {
+      await submitTask({
+        taskId: task.id,
+        agentId: 'agent-001', // This should come from auth context in production
+        answer,
+      });
+      toast.success('Task submitted successfully!');
+      setAnswer({}); // Reset answer for next task
+    } catch (error) {
+      toast.error('Failed to submit task');
+    }
+  };
+
   return (
     <Paper
       elevation={0}
       sx={{
-        // Styles from .opa-preview in previewer.css
         padding: '16px 12px',
         backgroundColor: '#eceff1',
         display: 'flex',
@@ -41,7 +65,6 @@ const TaskRenderer = ({ task }: TaskRendererProps) => {
 
           case 'suggestions':
             return (
-              // Styles from .opa-preview-suggestions-container
               <Box
                 key={index}
                 sx={{
@@ -53,14 +76,18 @@ const TaskRenderer = ({ task }: TaskRendererProps) => {
                 }}
               >
                 {item.suggestions.map((chip, chipIndex) => (
-                  <SuggestionChip key={chipIndex} label={chip.label} />
+                  <SuggestionChip
+                    key={chipIndex}
+                    label={chip.label}
+                    onClick={() => handleSuggestionClick(chip.label)}
+                    selected={answer.selectedSuggestion === chip.label}
+                  />
                 ))}
               </Box>
             );
 
           case 'card':
             return (
-              // Styles from .opa-preview-card
               <Box
                 key={index}
                 sx={{
@@ -71,7 +98,6 @@ const TaskRenderer = ({ task }: TaskRendererProps) => {
                 <img
                   src={item.content.imageUrl}
                   alt="Task-related card content"
-                  // Style from .opa-preview-card-img
                   style={{ maxWidth: '100%', marginLeft: '-5px' }}
                 />
               </Box>
@@ -81,6 +107,22 @@ const TaskRenderer = ({ task }: TaskRendererProps) => {
             return null;
         }
       })}
+
+      {answer.selectedSuggestion && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Selected: {answer.selectedSuggestion}
+        </Alert>
+      )}
+
+      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={isSubmitting || Object.keys(answer).length === 0}
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit'}
+        </Button>
+      </Box>
     </Paper>
   );
 };

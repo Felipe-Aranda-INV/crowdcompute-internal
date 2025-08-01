@@ -2,84 +2,77 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { Task } from '@/types/tasks';
 
-// ### IMPORTANT ###
-// This URL must be replaced with your actual Google Apps Script web app URL.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+// Replace with your actual Google Apps Script URL
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybzYID2K-SQX6q1N6-OuatREdkb1nd5rhnoxiG-Q4dZm3M99-kWD0vdwcYVGCDd8ys/exec';
 
 interface AgentState {
   currentTask: Task | null;
   isLoading: boolean;
+  isSubmitting: boolean;
   error: string | null;
-  actions: {
-    fetchNextTask: () => Promise<void>;
-    submitTask: (submissionData: {
-      taskId: string;
-      answer: Record<string, any>;
-    }) => Promise<void>;
-  };
+  fetchNextTask: () => Promise<void>;
+  submitTask: (submissionData: {
+    taskId: string;
+    agentId: string;
+    answer: Record<string, any>;
+  }) => Promise<void>;
 }
 
 const useAgentStore = create<AgentState>()(
   immer((set, get) => ({
     currentTask: null,
     isLoading: false,
+    isSubmitting: false,
     error: null,
-    actions: {
-      fetchNextTask: async () => {
-        set({ isLoading: true, error: null });
-        try {
-          // Construct the URL for the GET request
-          const url = new URL(APPS_SCRIPT_URL);
-          url.searchParams.append('action', 'getNextTask');
 
-          const response = await fetch(url.toString(), {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'text/plain;charset=utf-8',
-            },
-          });
+    fetchNextTask: async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const response = await fetch(APPS_SCRIPT_URL);
+        const result = await response.json();
 
-          // The response from a GET request to Google Apps Script is text.
-          const result = JSON.parse(await response.text());
-
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to fetch next task.');
-          }
-
-          set({ currentTask: result.data, isLoading: false });
-        } catch (error: any) {
-          console.error('Failed to fetch next task:', error);
-          set({ error: error.message, isLoading: false, currentTask: null });
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to fetch next task');
         }
-      },
-      submitTask: async (submissionData) => {
-        set({ isLoading: true });
-        try {
-          const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'submitTask',
-              payload: submissionData,
-            }),
-            mode: 'cors',
-          });
 
-          const result = await response.json();
+        // Get the first available task for now
+        const tasks = result.data;
+        const nextTask = tasks.length > 0 ? tasks[0] : null;
+        
+        set({ currentTask: nextTask, isLoading: false });
+      } catch (error: any) {
+        console.error('Failed to fetch next task:', error);
+        set({ error: error.message, isLoading: false, currentTask: null });
+      }
+    },
 
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to submit task.');
-          }
+    submitTask: async (submissionData) => {
+      set({ isSubmitting: true, error: null });
+      try {
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'submitTask',
+            payload: submissionData,
+          }),
+        });
 
-          // Submission successful, fetch the next task
-          await get().actions.fetchNextTask();
-        } catch (error: any) {
-          console.error('Failed to submit task:', error);
-          set({ error: `Failed to submit: ${error.message}`, isLoading: false });
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to submit task');
         }
-      },
+
+        // Fetch the next task after successful submission
+        await get().fetchNextTask();
+        set({ isSubmitting: false });
+      } catch (error: any) {
+        console.error('Failed to submit task:', error);
+        set({ error: error.message, isSubmitting: false });
+      }
     },
   }))
 );

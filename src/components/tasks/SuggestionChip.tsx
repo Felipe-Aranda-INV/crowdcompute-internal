@@ -1,25 +1,27 @@
 'use client';
 
-type Props = {
-  suggestion: string;
-  onClick: (suggestion: string) => void;
-};
+import { Chip } from '@mui/material';
 
-const SuggestionChip = ({ suggestion, onClick }: Props) => {
+interface SuggestionChipProps {
+  label: string;
+  onClick: () => void;
+  selected?: boolean;
+}
+
+const SuggestionChip: React.FC<SuggestionChipProps> = ({ label, onClick, selected = false }) => {
   return (
-    <button
-      style={{
-        background: '#f0f0f0',
-        border: '1px solid #ccc',
-        borderRadius: '16px',
-        padding: '8px 12px',
-        margin: '4px',
+    <Chip
+      label={label}
+      onClick={onClick}
+      color={selected ? 'primary' : 'default'}
+      variant={selected ? 'filled' : 'outlined'}
+      sx={{
         cursor: 'pointer',
+        '&:hover': {
+          backgroundColor: selected ? undefined : 'rgba(0, 0, 0, 0.04)',
+        },
       }}
-      onClick={() => onClick(suggestion)}
-    >
-      {suggestion}
-    </button>
+    />
   );
 };
 
