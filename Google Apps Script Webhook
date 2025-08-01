@@ -1,0 +1,535 @@
+// Google Apps Script Code - Deploy as Web App
+// This handles all CRUD operations for the CrowdCompute platform
+
+// Configuration - Update these with your actual sheet details
+const CONFIG = {
+  SPREADSHEET_ID: '1J2SPnxBhd3u7LWm4AOlCD5c9hrLGwI3jZJiOT_CvXaI', // Replace with your sheet ID
+  SHEETS: {
+    USERS: 'Users',
+    TASKS: 'Tasks', 
+    SUBMISSIONS: 'Submissions',
+    PROGRESS: 'Progress'
+  }
+};
+
+/**
+ * Main entry point for the web app
+ * Handles all HTTP requests (GET, POST, PUT, DELETE)
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const { action, payload } = data;
+    
+    console.log(`Received action: ${action}`, payload);
+    
+    switch (action) {
+      case 'createUser':
+        return createResponse(createUser(payload));
+      case 'getUser':
+        return createResponse(getUser(payload.email));
+      case 'createTask':
+        return createResponse(createTask(payload));
+      case 'getTasks':
+        return createResponse(getTasks(payload.filters));
+      case 'getNextTask':
+        return createResponse(getNextTask(payload.agentId));
+      case 'submitTask':
+        return createResponse(submitTask(payload));
+      case 'updateProgress':
+        return createResponse(updateProgress(payload));
+      case 'getProgress':
+        return createResponse(getProgress(payload.agentId));
+      case 'getAnalytics':
+        return createResponse(getAnalytics(payload));
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+  } catch (error) {
+    console.error('Error processing request:', error);
+    return createResponse(null, error.message);
+  }
+}
+
+/**
+ * Handle GET requests (for testing and simple queries)
+ */
+function doGet(e) {
+  const action = e.parameter.action;
+  
+  if (action === 'health') {
+    return createResponse({ status: 'healthy', timestamp: new Date().toISOString() });
+  }
+  
+  return createResponse({ message: 'CrowdCompute API is running. Use POST for data operations.' });
+}
+
+/**
+ * Create standardized API response
+ */
+function createResponse(data, error = null) {
+  const response = {
+    success: !error,
+    data: data,
+    error: error,
+    timestamp: new Date().toISOString()
+  };
+  
+  return ContentService
+    .createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
+
+/**
+ * Handle CORS preflight requests
+ */
+function doOptions(e) {
+  return ContentService
+    .createTextOutput('')
+    .setHeaders({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+}
+
+// ========== USER MANAGEMENT ==========
+
+/**
+ * Create or update user record
+ */
+function createUser(userData) {
+  const sheet = getSheet(CONFIG.SHEETS.USERS);
+  const { email, name, picture, role = 'agent' } = userData;
+  
+  // Check if user exists
+  const existingUser = getUser(email);
+  const timestamp = new Date().toISOString();
+  
+  const userRecord = {
+    id: existingUser?.id || generateId(),
+    google_id: userData.sub || userData.id,
+    email,
+    name,
+    picture,
+    role,
+    created_at: existingUser?.created_at || timestamp,
+    updated_at: timestamp,
+    certification_status: existingUser?.certification_status || 'pending'
+  };
+  
+  if (existingUser) {
+    // Update existing user
+    updateRowById(sheet, existingUser.id, userRecord);
+  } else {
+    // Create new user
+    appendRow(sheet, [
+      userRecord.id,
+      userRecord.google_id,
+      userRecord.email,
+      userRecord.name,
+      userRecord.picture,
+      userRecord.role,
+      userRecord.created_at,
+      userRecord.updated_at,
+      userRecord.certification_status
+    ]);
+  }
+  
+  return userRecord;
+}
+
+/**
+ * Get user by email
+ */
+function getUser(email) {
+  const sheet = getSheet(CONFIG.SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[headers.indexOf('email')] === email) {
+      return rowToObject(headers, row);
+    }
+  }
+  
+  return null;
+}
+
+// ========== TASK MANAGEMENT ==========
+
+/**
+ * Create a new task
+ */
+function createTask(taskData) {
+  const sheet = getSheet(CONFIG.SHEETS.TASKS);
+  const timestamp = new Date().toISOString();
+  
+  const taskRecord = {
+    id: generateId(),
+    title: taskData.title,
+    description: taskData.description || '',
+    content: JSON.stringify(taskData.content || {}),
+    difficulty: taskData.difficulty || 'medium',
+    category: taskData.category || 'general',
+    time_limit: taskData.timeLimit || 30,
+    status: 'active',
+    created_by: taskData.createdBy,
+    created_at: timestamp,
+    ai_answer: JSON.stringify(taskData.aiAnswer || {}),
+    grading_criteria: taskData.gradingCriteria || ''
+  };
+  
+  appendRow(sheet, [
+    taskRecord.id,
+    taskRecord.title,
+    taskRecord.description,
+    taskRecord.content,
+    taskRecord.difficulty,
+    taskRecord.category,
+    taskRecord.time_limit,
+    taskRecord.status,
+    taskRecord.created_by,
+    taskRecord.created_at,
+    taskRecord.ai_answer,
+    taskRecord.grading_criteria
+  ]);
+  
+  return taskRecord;
+}
+
+/**
+ * Get tasks with optional filters
+ */
+function getTasks(filters = {}) {
+  const sheet = getSheet(CONFIG.SHEETS.TASKS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  let tasks = [];
+  for (let i = 1; i < data.length; i++) {
+    const task = rowToObject(headers, data[i]);
+    
+    // Apply filters
+    if (filters.status && task.status !== filters.status) continue;
+    if (filters.category && task.category !== filters.category) continue;
+    if (filters.difficulty && task.difficulty !== filters.difficulty) continue;
+    if (filters.createdBy && task.created_by !== filters.createdBy) continue;
+    
+    // Parse JSON fields
+    try {
+      task.content = JSON.parse(task.content || '{}');
+      task.ai_answer = JSON.parse(task.ai_answer || '{}');
+    } catch (e) {
+      console.warn('Error parsing task JSON fields:', e);
+    }
+    
+    tasks.push(task);
+  }
+  
+  return tasks;
+}
+
+/**
+ * Get next available task for an agent
+ */
+function getNextTask(agentId) {
+  // Get all active tasks
+  const availableTasks = getTasks({ status: 'active' });
+  
+  // Get agent's completed/submitted tasks
+  const submissions = getSubmissions({ agentId });
+  const completedTaskIds = submissions.map(s => s.task_id);
+  
+  // Filter out completed tasks
+  const remainingTasks = availableTasks.filter(task => 
+    !completedTaskIds.includes(task.id)
+  );
+  
+  // Return first available task (you could add more sophisticated logic here)
+  return remainingTasks.length > 0 ? remainingTasks[0] : null;
+}
+
+// ========== SUBMISSION MANAGEMENT ==========
+
+/**
+ * Submit task completion
+ */
+function submitTask(submissionData) {
+  const sheet = getSheet(CONFIG.SHEETS.SUBMISSIONS);
+  const timestamp = new Date().toISOString();
+  
+  const submission = {
+    id: generateId(),
+    task_id: submissionData.taskId,
+    agent_id: submissionData.agentId,
+    answer: JSON.stringify(submissionData.answer),
+    submitted_at: timestamp,
+    ai_score: submissionData.aiScore || null,
+    feedback: submissionData.feedback || '',
+    graded_at: submissionData.aiScore ? timestamp : null,
+    status: submissionData.aiScore ? 'graded' : 'submitted'
+  };
+  
+  appendRow(sheet, [
+    submission.id,
+    submission.task_id,
+    submission.agent_id,
+    submission.answer,
+    submission.submitted_at,
+    submission.ai_score,
+    submission.feedback,
+    submission.graded_at,
+    submission.status
+  ]);
+  
+  // Update user progress
+  updateProgress({
+    agentId: submissionData.agentId,
+    taskCompleted: true,
+    score: submissionData.aiScore
+  });
+  
+  return submission;
+}
+
+/**
+ * Get submissions with filters
+ */
+function getSubmissions(filters = {}) {
+  const sheet = getSheet(CONFIG.SHEETS.SUBMISSIONS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  let submissions = [];
+  for (let i = 1; i < data.length; i++) {
+    const submission = rowToObject(headers, data[i]);
+    
+    // Apply filters
+    if (filters.agentId && submission.agent_id !== filters.agentId) continue;
+    if (filters.taskId && submission.task_id !== filters.taskId) continue;
+    if (filters.status && submission.status !== filters.status) continue;
+    
+    // Parse answer JSON
+    try {
+      submission.answer = JSON.parse(submission.answer || '{}');
+    } catch (e) {
+      console.warn('Error parsing submission answer:', e);
+    }
+    
+    submissions.push(submission);
+  }
+  
+  return submissions;
+}
+
+// ========== PROGRESS TRACKING ==========
+
+/**
+ * Update user progress
+ */
+function updateProgress(progressData) {
+  const sheet = getSheet(CONFIG.SHEETS.PROGRESS);
+  const { agentId, taskCompleted, score } = progressData;
+  
+  // Get existing progress
+  let existingProgress = getProgress(agentId);
+  const timestamp = new Date().toISOString();
+  
+  if (!existingProgress) {
+    // Create new progress record
+    existingProgress = {
+      id: generateId(),
+      agent_id: agentId,
+      total_tasks: 0,
+      completed_tasks: 0,
+      average_score: 0,
+      last_activity: timestamp
+    };
+  }
+  
+  // Update progress
+  if (taskCompleted) {
+    existingProgress.completed_tasks += 1;
+    if (score !== null && score !== undefined) {
+      const currentTotal = existingProgress.average_score * (existingProgress.completed_tasks - 1);
+      existingProgress.average_score = (currentTotal + score) / existingProgress.completed_tasks;
+    }
+  }
+  existingProgress.last_activity = timestamp;
+  
+  // Save or update
+  if (getProgress(agentId)) {
+    updateRowById(sheet, existingProgress.id, existingProgress);
+  } else {
+    appendRow(sheet, [
+      existingProgress.id,
+      existingProgress.agent_id,
+      existingProgress.total_tasks,
+      existingProgress.completed_tasks,
+      existingProgress.average_score,
+      existingProgress.last_activity
+    ]);
+  }
+  
+  return existingProgress;
+}
+
+/**
+ * Get progress for an agent
+ */
+function getProgress(agentId) {
+  const sheet = getSheet(CONFIG.SHEETS.PROGRESS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[headers.indexOf('agent_id')] === agentId) {
+      return rowToObject(headers, row);
+    }
+  }
+  
+  return null;
+}
+
+// ========== ANALYTICS ==========
+
+/**
+ * Get analytics data
+ */
+function getAnalytics(filters = {}) {
+  const submissions = getSubmissions();
+  const tasks = getTasks();
+  const users = getAllUsers();
+  
+  const analytics = {
+    totalSubmissions: submissions.length,
+    totalTasks: tasks.length,
+    totalUsers: users.length,
+    averageScore: submissions.length > 0 
+      ? submissions.reduce((sum, s) => sum + (s.ai_score || 0), 0) / submissions.length 
+      : 0,
+    completionRate: tasks.length > 0 
+      ? (submissions.length / (tasks.length * users.filter(u => u.role === 'agent').length)) * 100 
+      : 0,
+    tasksByDifficulty: groupBy(tasks, 'difficulty'),
+    submissionsByStatus: groupBy(submissions, 'status')
+  };
+  
+  return analytics;
+}
+
+// ========== UTILITY FUNCTIONS ==========
+
+/**
+ * Get sheet by name, create if it doesn't exist
+ */
+function getSheet(sheetName) {
+  const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    initializeSheet(sheet, sheetName);
+  }
+  
+  return sheet;
+}
+
+/**
+ * Initialize sheet with headers
+ */
+function initializeSheet(sheet, sheetName) {
+  const headers = {
+    [CONFIG.SHEETS.USERS]: ['id', 'google_id', 'email', 'name', 'picture', 'role', 'created_at', 'updated_at', 'certification_status'],
+    [CONFIG.SHEETS.TASKS]: ['id', 'title', 'description', 'content', 'difficulty', 'category', 'time_limit', 'status', 'created_by', 'created_at', 'ai_answer', 'grading_criteria'],
+    [CONFIG.SHEETS.SUBMISSIONS]: ['id', 'task_id', 'agent_id', 'answer', 'submitted_at', 'ai_score', 'feedback', 'graded_at', 'status'],
+    [CONFIG.SHEETS.PROGRESS]: ['id', 'agent_id', 'total_tasks', 'completed_tasks', 'average_score', 'last_activity']
+  };
+  
+  if (headers[sheetName]) {
+    sheet.getRange(1, 1, 1, headers[sheetName].length).setValues([headers[sheetName]]);
+    sheet.getRange(1, 1, 1, headers[sheetName].length).setFontWeight('bold');
+  }
+}
+
+/**
+ * Generate unique ID
+ */
+function generateId() {
+  return 'id_' + Utilities.getUuid().replace(/-/g, '').substring(0, 16);
+}
+
+/**
+ * Convert sheet row to object
+ */
+function rowToObject(headers, row) {
+  const obj = {};
+  headers.forEach((header, index) => {
+    obj[header] = row[index];
+  });
+  return obj;
+}
+
+/**
+ * Append row to sheet
+ */
+function appendRow(sheet, rowData) {
+  sheet.appendRow(rowData);
+}
+
+/**
+ * Update row by ID
+ */
+function updateRowById(sheet, id, newData) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idColumnIndex = headers.indexOf('id');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idColumnIndex] === id) {
+      // Update the row
+      headers.forEach((header, index) => {
+        if (newData[header] !== undefined) {
+          sheet.getRange(i + 1, index + 1).setValue(newData[header]);
+        }
+      });
+      break;
+    }
+  }
+}
+
+/**
+ * Get all users
+ */
+function getAllUsers() {
+  const sheet = getSheet(CONFIG.SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const users = [];
+  for (let i = 1; i < data.length; i++) {
+    users.push(rowToObject(headers, data[i]));
+  }
+  
+  return users;
+}
+
+/**
+ * Group array by property
+ */
+function groupBy(array, property) {
+  return array.reduce((groups, item) => {
+    const key = item[property];
+    groups[key] = groups[key] || [];
+    groups[key].push(item);
+    return groups;
+  }, {});
+}
